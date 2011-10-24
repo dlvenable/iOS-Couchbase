@@ -42,7 +42,7 @@
     @private
     id<CouchbaseDelegate> _delegate;
     CFAbsoluteTime _timeStarted;
-    NSString* _documentsDirectory;
+    NSString* _rootDirectory;
     NSString* _bundlePath;
     NSString* _iniFilePath;
     NSURL* _serverURL;
@@ -86,6 +86,11 @@
     (The default location is Resources/CouchbaseResources, but some application frameworks
     require resources to go elsewhere, so in that case you might need to use a custom path.) */
 - (id) initWithBundlePath: (NSString*)bundlePath;
+
+/** The root directory where Couchbase Mobile will store data files.
+    This defaults to ~/CouchbaseMobile.
+    You may NOT change this after starting the server. */
+@property (copy) NSString* rootDirectory;
 
 /** The directory where CouchDB writes its log files. */
 @property (readonly) NSString* logDirectory;

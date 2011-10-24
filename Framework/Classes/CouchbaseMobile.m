@@ -74,9 +74,27 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
     self = [super init];
     if (self) {
         _bundlePath = [bundlePath copy];
+
+        // rootDirectory defaults to ~/Library/Application Support/CouchbaseMobile.
+        // However, it used to be hardcoded to ~/Documents, so for backward compatibility
+        // (to keep apps from losing their data) we'll preserve that if we find a telltale
+        // ~/Documents/couchdb/ dir.
+
         NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask,
                                                              YES);
-        _documentsDirectory = [[paths objectAtIndex:0] copy];
+        NSString* documentsDir = [paths objectAtIndex:0];
+        BOOL isDir;
+        if ([[NSFileManager defaultManager]
+                     fileExistsAtPath: [documentsDir stringByAppendingPathComponent: @"couchdb"]
+                          isDirectory: &isDir] && isDir) {
+            _rootDirectory = [documentsDir copy];
+            NSLog(@"Couchbase: Found db files in ~/Documents, so using that as rootDirectory");
+        } else {
+            paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,
+                                                        NSUserDomainMask, YES);
+            _rootDirectory = [[[paths objectAtIndex:0]
+                                stringByAppendingPathComponent: @"CouchbaseMobile"] copy];
+        }
     }
     return self;
 }
@@ -92,7 +110,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    [_documentsDirectory release];
+    [_rootDirectory release];
     [_bundlePath release];
     [_iniFilePath release];
     [_serverURL release];
@@ -101,19 +119,31 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
 }
 
 
-@synthesize delegate = _delegate, iniFilePath=_iniFilePath, serverURL = _serverURL, error = _error, autoRestart = _autoRestart;
+@synthesize delegate = _delegate, iniFilePath = _iniFilePath, serverURL = _serverURL, error = _error, autoRestart = _autoRestart;
 
+- (NSString*) rootDirectory {
+    return _rootDirectory;
+}
+
+- (void) setRootDirectory:(NSString *)rootDirectory {
+    NSParameterAssert([rootDirectory hasPrefix: @"/"]);
+    NSAssert(!_started, @"Cannot set rootDirectory after starting server");
+    if (rootDirectory != _rootDirectory) {
+        [_rootDirectory release];
+        _rootDirectory = [rootDirectory copy];
+    }
+}
 
 - (NSString*) logDirectory {
-    return [_documentsDirectory stringByAppendingPathComponent:@"log"];
+    return [_rootDirectory stringByAppendingPathComponent:@"log"];
 }
 
 - (NSString*) databaseDirectory {
-    return [_documentsDirectory stringByAppendingPathComponent:@"couchdb"];
+    return [_rootDirectory stringByAppendingPathComponent:@"couchdb"];
 }
 
 - (NSString*) localIniFilePath {
-    return [_documentsDirectory stringByAppendingPathComponent:@"couchdb_local.ini"];
+    return [_rootDirectory stringByAppendingPathComponent:@"couchdb_local.ini"];
 }
 
 
@@ -134,19 +164,20 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
     _timeStarted = CFAbsoluteTimeGetCurrent();
 	NSLog(@"Couchbase: Starting CouchDB, using runtime files at: %@ (built %s, %s)",
           _bundlePath, __DATE__, __TIME__);
+    NSLog(@"Couchbase: Storing data in %@", _rootDirectory);
 
     if(![self createDir: self.logDirectory]
            || ![self createDir: self.databaseDirectory]
            || ![self createFile:self.localIniFilePath contents: @""]
-           || ![self deleteFile:@"couch.uri" fromDir:_documentsDirectory])
+           || ![self deleteFile:@"couch.uri" fromDir:_rootDirectory])
     {
         return NO;
     }
-    
+
     // Customize & install default_ios.ini:
     if (![self installTemplateNamed: @"default_ios.ini"
                             fromDir: _bundlePath
-                              toDir: _documentsDirectory])
+                              toDir: _rootDirectory])
         return NO;
 
     _started = YES;
@@ -164,7 +195,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
 }
 
 - (void) restart {
-    [[NSNotificationCenter defaultCenter] 
+    [[NSNotificationCenter defaultCenter]
      postNotificationName:kInternalRestartCouchNotification object:nil];
 }
 
@@ -186,7 +217,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         // Yes, there are up to four layers of .ini files: Default, iOS, app, local.
         erlang_args[11] = strdup([[_bundlePath stringByAppendingPathComponent:@"default.ini"]
                                             fileSystemRepresentation]);
-        erlang_args[12] = strdup([[_documentsDirectory stringByAppendingPathComponent:
+        erlang_args[12] = strdup([[_rootDirectory stringByAppendingPathComponent:
                                             @"default_ios.ini"] fileSystemRepresentation]);
         erlang_argc = 13;
         if (_iniFilePath)
@@ -202,7 +233,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         setenv("ROOTDIR", erl_root, 1);
         setenv("BINDIR", erl_bin, 1);
         setenv("ERL_INETRC", erl_inetrc, 1);
-        
+
         [pool drain];
     }
 
@@ -296,18 +327,18 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
 - (BOOL)installItemNamed:(NSString*)name
                  fromDir:(NSString*)fromDir
                    toDir:(NSString*)toDir
-                 replace:(BOOL)replace 
+                 replace:(BOOL)replace
 {
 	NSString *source = fromDir ? [fromDir stringByAppendingPathComponent: name] : name;
 	NSString *target = [toDir stringByAppendingPathComponent: [name lastPathComponent]];
-    
+
     NSError* error;
 	NSFileManager *fm= [NSFileManager defaultManager];
     NSDate* targetModDate = [[fm attributesOfItemAtPath: target error:NULL] fileModificationDate];
     if (targetModDate) {
         if (!replace)
             return YES;     // Told not to overwrite, so return immediately
-        
+
         NSDate* sourceModDate = [[fm attributesOfItemAtPath: source error:&error]
                                         fileModificationDate];
         if (!sourceModDate) {
@@ -317,7 +348,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         }
         if ([targetModDate compare: sourceModDate] >= 0)
             return YES;     // target exists and is at least as new as the source
-        
+
         // Need to delete target first, or -copyItemAtPath will fail
         if (![fm removeItemAtPath: target error: &error]) {
             NSLog(@"Couchbase: Error installing to %@: %@", target, error);
@@ -325,7 +356,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
             return NO;
         }
     }
-    
+
     // OK, do the copy:
     if ([fm copyItemAtPath: source toPath: target error: &error]) {
         NSLog(@"Couchbase: Installed %@ into %@", [name lastPathComponent], target);
@@ -374,7 +405,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
                                  options: 0
                                    range: NSMakeRange(0, contents.length)];
     [contents replaceOccurrencesOfString: @"$INSTALLDIR"
-                              withString: _documentsDirectory
+                              withString: _rootDirectory
                                  options: 0
                                    range: NSMakeRange(0, contents.length)];
     NSData* newData = [contents dataUsingEncoding: NSUTF8StringEncoding];
