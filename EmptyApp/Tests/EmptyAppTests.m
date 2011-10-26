@@ -304,4 +304,12 @@ extern CouchbaseMobile* sCouchbase;  // Defined in EmptyAppDelegate.m
 }
 
 
+- (void)test7_SSL {
+    [self send: @"PUT" toPath: @"/unittestdb" body: nil];
+    [self send: @"POST" toPath: @"/_replicate" 
+          body: @"{\"target\":\"unittestdb\","
+                    "\"source\":\"https://snej.iriscouch.com/intentionally-left-blank\"}"];
+}
+
+
 @end
