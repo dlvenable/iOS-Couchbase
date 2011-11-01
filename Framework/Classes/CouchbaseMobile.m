@@ -400,6 +400,10 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         return NO;
     }
 
+    [contents replaceOccurrencesOfString: @"$APPDIR"
+                              withString: [[NSBundle mainBundle] bundlePath]
+                                 options: 0
+                                   range: NSMakeRange(0, contents.length)];
     [contents replaceOccurrencesOfString: @"$BUNDLEDIR"
                               withString: _bundlePath
                                  options: 0

@@ -305,6 +305,11 @@ extern CouchbaseMobile* sCouchbase;  // Defined in EmptyAppDelegate.m
 
 
 - (void)test7_SSL {
+    // SSL cert validation is turned on by default (as it should be!) but we are not hooked up to
+    // the OS's root cert list, so apps have to provide their own CouchbaseTrustedCerts.pem file
+    // at the root of the bundle. The EmptyApp has such a file that contains the root cert used
+    // by iriscouch.com (the "ValiCert Class 2 Policy Validation Authority"), so that this test
+    // will pass.
     [self send: @"PUT" toPath: @"/unittestdb" body: nil];
     [self send: @"POST" toPath: @"/_replicate" 
           body: @"{\"target\":\"unittestdb\","

@@ -16,6 +16,7 @@
 		273112DF140559B30072C622 /* Couchbase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27A3AD1A13C78C32008CE9F0 /* Couchbase.framework */; };
 		273112E1140559B30072C622 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 27A3ACF213C78BD9008CE9F0 /* InfoPlist.strings */; };
 		273112EB14055A410072C622 /* app.ini in Resources */ = {isa = PBXBuildFile; fileRef = 273112EA14055A410072C622 /* app.ini */; };
+		2778ACD61460B9F20079FC90 /* CouchbaseTrustedCerts.pem in Resources */ = {isa = PBXBuildFile; fileRef = 2778ACD51460B9F20079FC90 /* CouchbaseTrustedCerts.pem */; };
 		278D67FA1411494100198716 /* SenTestingKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27A3AD0113C78BD9008CE9F0 /* SenTestingKit.framework */; };
 		2794EBF914227AD200A53EE2 /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2794EBF814227AD200A53EE2 /* libz.dylib */; };
 		2794EBFB14227B1100A53EE2 /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2794EBF814227AD200A53EE2 /* libz.dylib */; };
@@ -54,6 +55,7 @@
 		273112E6140559B30072C622 /* Listener.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Listener.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		273112EA14055A410072C622 /* app.ini */ = {isa = PBXFileReference; explicitFileType = text; fileEncoding = 4; path = app.ini; sourceTree = "<group>"; };
 		2753C254140D54E300F334A7 /* installResources.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = installResources.sh; sourceTree = "<group>"; };
+		2778ACD51460B9F20079FC90 /* CouchbaseTrustedCerts.pem */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = CouchbaseTrustedCerts.pem; sourceTree = "<group>"; };
 		2794EBF814227AD200A53EE2 /* libz.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libz.dylib; path = usr/lib/libz.dylib; sourceTree = SDKROOT; };
 		27962303142026430051455D /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		27A3ACE513C78BD9008CE9F0 /* Empty App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Empty App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -175,6 +177,7 @@
 				27A3ACF713C78BD9008CE9F0 /* Empty App-Prefix.pch */,
 				273112EA14055A410072C622 /* app.ini */,
 				2753C254140D54E300F334A7 /* installResources.sh */,
+				2778ACD51460B9F20079FC90 /* CouchbaseTrustedCerts.pem */,
 			);
 			name = "Supporting Files";
 			sourceTree = "<group>";
@@ -299,6 +302,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				27A3ACF413C78BD9008CE9F0 /* InfoPlist.strings in Resources */,
+				2778ACD61460B9F20079FC90 /* CouchbaseTrustedCerts.pem in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
