@@ -47,6 +47,7 @@
     NSString* _iniFilePath;
     NSURL* _serverURL;
     NSError* _error;
+    uint8_t _logLevel;
     BOOL _autoRestart;
     BOOL _started;
 }
@@ -109,6 +110,11 @@
     _config URI. The app can restore the default configuration at launch by deleting or
     emptying the file at this path before calling -start.*/
 @property (readonly) NSString* localIniFilePath;
+
+/** Controls the amount of logging by Erlang and CouchDB.
+    Defaults to 0, meaning none.
+    1 logs errors only, 2 also logs CouchDB info (like HTTP requests), 3 logs Erlang 'progress'. */
+@property uint8_t logLevel;
 
 /** Copies a database file into the databaseDirectory if no such file exists there already.
     Call this before -start, to set up initial contents of one or more databases on first run. */
