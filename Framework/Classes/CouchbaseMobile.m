@@ -119,7 +119,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
 }
 
 
-@synthesize delegate = _delegate, iniFilePath = _iniFilePath, serverURL = _serverURL, error = _error, autoRestart = _autoRestart;
+@synthesize delegate = _delegate, iniFilePath = _iniFilePath, serverURL = _serverURL, error = _error, autoRestart = _autoRestart, logLevel = _logLevel;
 
 - (NSString*) rootDirectory {
     return _rootDirectory;
@@ -162,9 +162,11 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         return YES;
 
     _timeStarted = CFAbsoluteTimeGetCurrent();
-	NSLog(@"Couchbase: Starting CouchDB, using runtime files at: %@ (built %s, %s)",
-          _bundlePath, __DATE__, __TIME__);
-    NSLog(@"Couchbase: Storing data in %@", _rootDirectory);
+    if (_logLevel >= 2) {
+        NSLog(@"Couchbase: Starting CouchDB, using runtime files at: %@ (built %s, %s)",
+              _bundlePath, __DATE__, __TIME__);
+        NSLog(@"Couchbase: Storing data in %@", _rootDirectory);
+    }
 
     if(![self createDir: self.logDirectory]
            || ![self createDir: self.databaseDirectory]
@@ -199,27 +201,36 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
      postNotificationName:kInternalRestartCouchNotification object:nil];
 }
 
+
 #pragma mark LAUNCHING ERLANG:
 
 // Body of the pthread that runs Erlang (and CouchDB)
 - (void)erlangThread {
-	char* erlang_args[15] = {"beam", "--", "-noinput",
-        "-sasl", "errlog_type", "error",  // Change "error" to "all" to re-enable progress reports
+	const char* erlang_args[21] = {"beam", "--", "-noinput",
+        "-kernel", "error_logger", NULL /*kernel log*/,
+        "-sasl", "errlog_type", NULL /*log level*/,
+        "-sasl", "sasl_error_logger", NULL /*log type*/,
 		"-eval", "R = application:start(couch), io:format(\"~w~n\",[R]).",
 		"-root", NULL, "-couch_ini", NULL, NULL, NULL, NULL};
     int erlang_argc;
     {
+        // Log level. 0 is silent, 1-2 shows errors, 3 shows progress.
+        // (The difference between 1 and 2 is that 2 shows CouchDB [info] logs; see below
+        erlang_args[5] = _logLevel > 0 ? "tty" : "silent";
+        erlang_args[8] = _logLevel >= 3 ? "progress" : "error";
+        erlang_args[11] = _logLevel > 0 ? "tty" : "false";
+
         // Alloc some paths to pass in as args to erl_start:
         NSAutoreleasePool* pool = [NSAutoreleasePool new];
         char* erl_root = strdup([[_bundlePath stringByAppendingPathComponent:@"erlang"]
                                             fileSystemRepresentation]);
-        erlang_args[9] = erl_root;
+        erlang_args[15] = erl_root;
         // Yes, there are up to four layers of .ini files: Default, iOS, app, local.
-        erlang_args[11] = strdup([[_bundlePath stringByAppendingPathComponent:@"default.ini"]
+        erlang_args[17] = strdup([[_bundlePath stringByAppendingPathComponent:@"default.ini"]
                                             fileSystemRepresentation]);
-        erlang_args[12] = strdup([[_rootDirectory stringByAppendingPathComponent:
+        erlang_args[18] = strdup([[_rootDirectory stringByAppendingPathComponent:
                                             @"default_ios.ini"] fileSystemRepresentation]);
-        erlang_argc = 13;
+        erlang_argc = 19;
         if (_iniFilePath)
             erlang_args[erlang_argc++] = strdup([_iniFilePath fileSystemRepresentation]);
         erlang_args[erlang_argc++] = strdup([self.localIniFilePath fileSystemRepresentation]);
@@ -237,7 +248,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         [pool drain];
     }
 
-	erl_start(erlang_argc, erlang_args);     // This never returns (unless Erlang exits)
+	erl_start(erlang_argc, (char**)erlang_args);     // This never returns (unless Erlang exits)
 }
 
 
@@ -261,8 +272,9 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
     NSURL* serverURL = urlStr ? [NSURL URLWithString:urlStr] : nil;
     NSError* error = nil;
     if (serverURL) {
-        NSLog(@"Couchbase: CouchDB is up and running after %.3f sec at <%@>",
-              (CFAbsoluteTimeGetCurrent() - _timeStarted), serverURL);
+        if (_logLevel >= 2)
+            NSLog(@"Couchbase: CouchDB is up and running after %.3f sec at <%@>",
+                  (CFAbsoluteTimeGetCurrent() - _timeStarted), serverURL);
     } else {
         NSLog(@"Couchbase: Error: CouchDB returned invalid server URL");
         error = [NSError errorWithDomain:@"Couchbase" code:1 userInfo:nil]; //TODO: Real error
@@ -294,7 +306,8 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         NSError* createError = nil;
 		if([fm createDirectoryAtPath:dirName withIntermediateDirectories:YES
                           attributes:nil error:&createError]) {
-            NSLog(@"Couchbase: Created dir %@", dirName);
+            if (_logLevel >= 2)
+                NSLog(@"Couchbase: Created dir %@", dirName);
         } else {
 			NSLog(@"Couchbase: Error creating dir '%@': %@", dirName, createError);
             self.error = createError;
@@ -359,7 +372,8 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
 
     // OK, do the copy:
     if ([fm copyItemAtPath: source toPath: target error: &error]) {
-        NSLog(@"Couchbase: Installed %@ into %@", [name lastPathComponent], target);
+        if (_logLevel >= 2)
+            NSLog(@"Couchbase: Installed %@ into %@", [name lastPathComponent], target);
         return YES;
     } else {
         NSLog(@"Couchbase: Error installing to %@: %@", target, error);
@@ -400,10 +414,14 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         return NO;
     }
 
-    [contents replaceOccurrencesOfString: @"$APPDIR"
-                              withString: [[NSBundle mainBundle] bundlePath]
+    [contents replaceOccurrencesOfString: @"$LOGLEVEL"
+                              withString: (_logLevel >= 2 ? @"info" : @"none")
                                  options: 0
                                    range: NSMakeRange(0, contents.length)];
+    [contents replaceOccurrencesOfString: @"$APPDIR"
+                              withString: [[NSBundle mainBundle] bundlePath]
+                              options: 0
+                                range: NSMakeRange(0, contents.length)];
     [contents replaceOccurrencesOfString: @"$BUNDLEDIR"
                               withString: _bundlePath
                                  options: 0
@@ -420,7 +438,8 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         return YES;   // No need to copy
 
     if ([newData writeToFile: target options: NSDataWritingFileProtectionNone error: &error]) {
-        NSLog(@"Couchbase: Installed customized %@ into %@", [name lastPathComponent], target);
+        if (_logLevel >= 2)
+            NSLog(@"Couchbase: Installed customized %@ into %@", [name lastPathComponent], target);
         return YES;
     } else {
         NSLog(@"Couchbase: Error installing to %@: %@", target, error);

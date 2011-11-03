@@ -34,9 +34,10 @@ CouchbaseMobile* sCouchbase;  // Used by the unit tests
     // Initialize CouchDB:
     CouchbaseMobile* cb = [[CouchbaseMobile alloc] init];
     cb.delegate = self;
+    cb.logLevel = 2;    // Enable Erlang errors and CouchDB info
     NSString* iniPath = [[NSBundle mainBundle] pathForResource: @"app" ofType: @"ini"];
     if (iniPath) {
-        NSLog(@"Registering custom .ini file %@", iniPath);
+        NSLog(@"Empty App: Registering custom .ini file %@", iniPath);
         cb.iniFilePath = iniPath;
     }
     NSAssert([cb start], @"Couchbase couldn't start! Error = %@", cb.error);
@@ -66,7 +67,7 @@ CouchbaseMobile* sCouchbase;  // Used by the unit tests
 
 
 -(void)couchbaseMobile:(CouchbaseMobile*)couchbase didStart:(NSURL*)serverURL {
-	NSLog(@"CouchDB is Ready, go!");
+	NSLog(@"Empty App: CouchDB is Ready, go!");
     NSLog(@"My local IP address is %@", self.localIPAddress);
     self.serverURL = serverURL;
     
