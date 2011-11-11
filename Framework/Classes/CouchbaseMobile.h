@@ -81,6 +81,10 @@
 /** Defaults to YES, set to NO to prevent auto-restart behavior when app returns from background */
 @property (assign) BOOL autoRestart;
 
+/** A credential containing the admin username and password of the server.
+    These are required in any requests sent to the server. The password is generated randomly on first launch. */
+@property (readonly) NSURLCredential* adminCredential;
+
 #pragma mark CONFIGURATION:
 
 /** Initializes the instance with a nonstandard location for the runtime resources.

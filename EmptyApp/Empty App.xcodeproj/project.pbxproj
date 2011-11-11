@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		270B6A55146CA13500AAD650 /* RESTBase64.m in Sources */ = {isa = PBXBuildFile; fileRef = 270B6A54146CA13500AAD650 /* RESTBase64.m */; };
+		270B6A56146CA13500AAD650 /* RESTBase64.m in Sources */ = {isa = PBXBuildFile; fileRef = 270B6A54146CA13500AAD650 /* RESTBase64.m */; };
+		270B6A5A146D957A00AAD650 /* TestConnection.m in Sources */ = {isa = PBXBuildFile; fileRef = 270B6A59146D957A00AAD650 /* TestConnection.m */; };
+		270B6A5B146D957A00AAD650 /* TestConnection.m in Sources */ = {isa = PBXBuildFile; fileRef = 270B6A59146D957A00AAD650 /* TestConnection.m */; };
 		273112D8140559B30072C622 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 27A3ACF513C78BD9008CE9F0 /* main.m */; };
 		273112D9140559B30072C622 /* EmptyAppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 27A3ACF913C78BD9008CE9F0 /* EmptyAppDelegate.m */; };
 		273112DB140559B30072C622 /* libstdc++.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 27A3AD1C13C78DAC008CE9F0 /* libstdc++.dylib */; };
@@ -52,6 +56,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		270B6A53146CA13500AAD650 /* RESTBase64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RESTBase64.h; sourceTree = "<group>"; };
+		270B6A54146CA13500AAD650 /* RESTBase64.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RESTBase64.m; sourceTree = "<group>"; };
+		270B6A58146D957A00AAD650 /* TestConnection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestConnection.h; sourceTree = "<group>"; };
+		270B6A59146D957A00AAD650 /* TestConnection.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TestConnection.m; sourceTree = "<group>"; };
 		273112E6140559B30072C622 /* Listener.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Listener.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		273112EA14055A410072C622 /* app.ini */ = {isa = PBXFileReference; explicitFileType = text; fileEncoding = 4; path = app.ini; sourceTree = "<group>"; };
 		2753C254140D54E300F334A7 /* installResources.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = installResources.sh; sourceTree = "<group>"; };
@@ -187,6 +195,10 @@
 			children = (
 				27A3AD0E13C78BD9008CE9F0 /* EmptyAppTests.h */,
 				27A3AD1013C78BD9008CE9F0 /* EmptyAppTests.m */,
+				270B6A58146D957A00AAD650 /* TestConnection.h */,
+				270B6A59146D957A00AAD650 /* TestConnection.m */,
+				270B6A53146CA13500AAD650 /* RESTBase64.h */,
+				270B6A54146CA13500AAD650 /* RESTBase64.m */,
 				27A3AD0913C78BD9008CE9F0 /* Supporting Files */,
 			);
 			path = Tests;
@@ -379,6 +391,8 @@
 				27A3ACF613C78BD9008CE9F0 /* main.m in Sources */,
 				27A3ACFA13C78BD9008CE9F0 /* EmptyAppDelegate.m in Sources */,
 				27EE5C8614103F50000AB2D7 /* EmptyAppTests.m in Sources */,
+				270B6A55146CA13500AAD650 /* RESTBase64.m in Sources */,
+				270B6A5A146D957A00AAD650 /* TestConnection.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -387,6 +401,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				27A3AD1113C78BD9008CE9F0 /* EmptyAppTests.m in Sources */,
+				270B6A56146CA13500AAD650 /* RESTBase64.m in Sources */,
+				270B6A5B146D957A00AAD650 /* TestConnection.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

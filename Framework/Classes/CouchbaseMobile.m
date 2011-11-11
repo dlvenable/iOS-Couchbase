@@ -24,6 +24,8 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <CommonCrypto/CommonDigest.h>
+#include <Security/SecRandom.h>
 #include <UIKit/UIApplication.h>
 
 // Erlang entry point
@@ -31,6 +33,9 @@ void erl_start(int, char**);
 
 static NSString* const kInternalCouchStartedNotification = @"couchStarted";
 static NSString* const kInternalRestartCouchNotification = @"CouchDBRequestRestart";
+
+#define kAdminUserName @"cbmi-local-admin"
+#define kAdminPasswordPref @"CouchbaseMobileAdmin"
 
 
 static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for CouchDB to start
@@ -49,6 +54,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
                      fromDir:(NSString*)fromDir
                        toDir:(NSString*)toDir;
 - (BOOL)deleteFile:(NSString*)filename fromDir: (NSString*)fromDir;
+- (BOOL) setupAdminAccount;
 @end
 
 
@@ -170,7 +176,7 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
 
     if(![self createDir: self.logDirectory]
            || ![self createDir: self.databaseDirectory]
-           || ![self createFile:self.localIniFilePath contents: @""]
+           || ![self setupAdminAccount]
            || ![self deleteFile:@"couch.uri" fromDir:_rootDirectory])
     {
         return NO;
@@ -310,6 +316,81 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
     NSLog(@"Couchbase: Error: No startup notification from server engine");
     self.error = [NSError errorWithDomain:@"Couchbase" code:2 userInfo:nil]; //TODO: Real error
     [_delegate couchbaseMobile:self failedToStart:_error];
+}
+
+
+#pragma mark - ADMIN ACCOUNT:
+
+
+- (NSString*) hexOfBytes:(const uint8_t*)bytes length:(size_t)length {
+    char out[2*length+1];
+    char *dst = &out[0];
+    for( size_t i=0; i<length; i+=1 )
+        dst += sprintf(dst,"%02x", bytes[i]);
+    return [[[NSString alloc] initWithBytes: out length: 2*length encoding: NSASCIIStringEncoding]
+            autorelease];
+
+}
+
+
+- (NSString*)randomStringOfLength: (size_t)length {
+    size_t byteCount = length/2;
+    uint8_t bytes[byteCount];
+    SecRandomCopyBytes(kSecRandomDefault, byteCount, bytes);
+    return [self hexOfBytes: bytes length: byteCount];
+}
+
+
+- (NSString*) hashPassword: (NSString*)password withSalt: (NSString*)salt {
+    // Compute the SHA-1 digest of the password concatenated with the salt:
+    uint8_t digest[CC_SHA1_DIGEST_LENGTH];
+    NSData* d = [[password stringByAppendingString: salt] dataUsingEncoding: NSUTF8StringEncoding];
+    CC_SHA1(d.bytes, d.length, digest);
+    return [self hexOfBytes: digest length: sizeof(digest)];
+}
+
+
+- (BOOL) setupAdminAccount {
+    NSString* path = self.localIniFilePath;
+    NSString* contents = [NSString stringWithContentsOfFile: path encoding: NSUTF8StringEncoding error: nil];
+    if (contents) {
+        NSRange r = [contents rangeOfString: @"\n[admins]\n" kAdminUserName " = "];
+        if (r.length > 0)
+            return YES;  // already contains an admin section
+    } else {
+        contents = @"";
+    }
+
+    NSString* password = [self randomStringOfLength: 32];
+    NSString* salt = [self randomStringOfLength: 32];
+    NSString* hashedPassword = [self hashPassword: password withSalt: salt];
+
+    contents = [contents stringByAppendingFormat: @"\n\n[admins]\n%@ = -hashed-%@,%@\n",
+                kAdminUserName, hashedPassword, salt];
+
+    NSError* error = nil;
+    if (![contents writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error: &error]) {
+        NSLog(@"Couchbase: Error writing file '%@': %@", path, error);
+        self.error = error;
+        return NO;
+    }
+
+    NSUserDefaults* dflts = [NSUserDefaults standardUserDefaults];
+    [dflts setObject: password forKey: kAdminPasswordPref];
+    [dflts synchronize]; // make sure the password is saved, else it'll be lost
+
+    return YES;
+}
+
+
+- (NSURLCredential*) adminCredential {
+    NSString* password = [[NSUserDefaults standardUserDefaults] stringForKey: kAdminPasswordPref];
+    if (!password)
+        return nil;
+    return [NSURLCredential
+            credentialWithUser: kAdminUserName
+            password: password
+            persistence: NSURLCredentialPersistenceForSession];
 }
 
 
@@ -463,5 +544,6 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
         return NO;
     }
 }
+
 
 @end

@@ -7,6 +7,8 @@
 //
 
 #import "EmptyAppTests.h"
+#import "RESTBase64.h"
+#import "TestConnection.h"
 #import <Couchbase/CouchbaseMobile.h>
 #import <Couchbase/CouchbaseCallbacks.h>
 
@@ -42,45 +44,25 @@ extern CouchbaseMobile* sCouchbase;  // Defined in EmptyAppDelegate.m
 }
 
 
-- (NSURLRequest*)request: (NSString*)method path: (NSString*)relativePath body: (NSString*)body {
-    NSURL* url = [NSURL URLWithString: relativePath relativeToURL: sCouchbase.serverURL];
-    NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL: url];
-    request.HTTPMethod = method;
-    request.cachePolicy = NSURLRequestReloadIgnoringCacheData;
-    if (body) {
-        request.HTTPBody = [body dataUsingEncoding: NSUTF8StringEncoding];
-        [request addValue: @"application/json" forHTTPHeaderField: @"Content-Type"];
-    }
-    return request;
-}
-
-
 - (NSString*)send: (NSString*)method
            toPath: (NSString*)relativePath
              body: (NSString*)body
   responseHeaders: (NSDictionary**)outResponseHeaders
 {
     NSLog(@"%@ %@", method, relativePath);
-    NSURLRequest* request = [self request:method path:relativePath body:body];
-    NSHTTPURLResponse* response = nil;
-    NSError* error = nil;
-    
-    // This is for testing only! In a real app you would not want to send URL requests synchronously.
-    NSData* responseBody = [NSURLConnection sendSynchronousRequest: request
-                                                 returningResponse: (NSURLResponse**)&response
-                                                             error: &error];
-    STAssertTrue(responseBody != nil && response != nil,
-             @"Request to <%@> failed: %@", request.URL.absoluteString, error);
-    int statusCode = response.statusCode;
+    TestConnection* conn = [TestConnection connectionWithMethod:method path:relativePath body:body];
+    [conn run];
+    STAssertNil(conn.error,
+             @"Request to <%@> failed: %@", conn.URL.absoluteString, conn.error);
+    int statusCode = conn.response.statusCode;
     STAssertTrue(statusCode < 300,
-             @"Request to <%@> failed: HTTP error %i", request.URL.absoluteString, statusCode);
-    
+             @"Request to <%@> failed: HTTP error %i", conn.URL.absoluteString, statusCode);
+
     if (outResponseHeaders)
-        *outResponseHeaders = response.allHeaderFields;
-    NSString* responseStr = [[NSString alloc] initWithData: responseBody
-                                                  encoding: NSUTF8StringEncoding];
+        *outResponseHeaders = conn.response.allHeaderFields;
+    NSString* responseStr = conn.responseString;
     NSLog(@"Response (%d):\n%@", statusCode, responseStr);
-    return [responseStr autorelease];
+    return responseStr;
 }
 
 - (NSString*)send: (NSString*)method
@@ -89,12 +71,23 @@ extern CouchbaseMobile* sCouchbase;  // Defined in EmptyAppDelegate.m
     return [self send:method toPath:relativePath body:body responseHeaders:NULL];
 }
 
-
 - (void)forciblyDeleteDatabase {
-    // No error checking, since this may return a 404
-    [NSURLConnection sendSynchronousRequest: [self request:@"DELETE" path:@"/unittestdb" body:nil]
-                          returningResponse: NULL
-                                      error: NULL];
+    // No error checking, since this may legitimately return a 404
+    [[TestConnection connectionWithMethod:@"DELETE" path:@"/unittestdb" body:nil] run];
+}
+
+
+#pragma mark - TESTS
+
+
+- (void)test0_adminPassword {
+    NSURLCredential* credential = sCouchbase.adminCredential;
+    STAssertNotNil(credential, nil);
+    NSLog(@"Admin username = '%@', password = '%@'", credential.user, credential.password);
+    STAssertTrue(credential.user.length >=  1, @"username non-empty");
+    STAssertTrue(credential.password.length >= 32, @"password at least 32 chars");
+
+    [self send: @"GET" toPath: @"/_session" body: nil];
 }
 
 
@@ -207,7 +200,7 @@ extern CouchbaseMobile* sCouchbase;  // Defined in EmptyAppDelegate.m
         "\"special\": [false, null, true],"
         "\"empty array\":[],"
         "\"empty dict\": {}}"];
-    
+
     [[CouchbaseCallbacks sharedInstance] registerMapBlock:
      ^(NSDictionary *doc, CouchEmitBlock emit) {
          NSString* txt = [doc objectForKey: @"txt"];
@@ -230,14 +223,14 @@ extern CouchbaseMobile* sCouchbase;  // Defined in EmptyAppDelegate.m
          }
          emit(txt, nil);
      } forKey: @"testValuesMap"];
-    
+
     [[CouchbaseCallbacks sharedInstance] registerMapBlock:
      ^(NSDictionary *doc, CouchEmitBlock emit) {
          NSLog(@"In faux map block");
          emit(@"objc", nil);
      } forKey: @"fauxMap"];
 
-    
+
     [[CouchbaseCallbacks sharedInstance] registerReduceBlock:
      ^ id (NSArray *keys, NSArray *values, BOOL rereduce) {
          NSLog(@"In reduce block");
@@ -275,7 +268,8 @@ extern CouchbaseMobile* sCouchbase;  // Defined in EmptyAppDelegate.m
     [[CouchbaseCallbacks sharedInstance] registerValidateUpdateBlock:
      ^BOOL(NSDictionary *doc, id<CouchbaseValidationContext> context) {
          STAssertEqualObjects(context.databaseName, @"unittestdb", nil);
-         STAssertNil(context.userName, nil);
+         NSURLCredential* credential = sCouchbase.adminCredential;
+         STAssertEqualObjects(context.userName, credential.user, nil);
          STAssertTrue(context.isAdmin, nil);
          STAssertNotNil(context.security, nil);
          BOOL ok = [doc objectForKey: @"valid"] != nil;
@@ -289,18 +283,14 @@ extern CouchbaseMobile* sCouchbase;  // Defined in EmptyAppDelegate.m
     [self send: @"PUT" toPath: @"/unittestdb/_design/objcvalidation"
           body: @"{\"language\":\"objc\","
                 @"\"validate_doc_update\":\"VALIDATE\"}"];
-    
+
     [self send: @"PUT" toPath: @"/unittestdb/doc1" body: @"{\"valid\":true}"];
-    
-    NSURLRequest* request = [self request:@"PUT" path:@"/unittestdb/doc2"
-                                     body:@"{\"something\":\"O HAI\"}"];
-    NSHTTPURLResponse* response = nil;
-    NSData* output = [NSURLConnection sendSynchronousRequest: request
-                          returningResponse: (NSURLResponse**)&response
-                                      error: NULL];
-    STAssertEquals(response.statusCode, 403, @"Unexpected HTTP status (should be forbidden)");
-    NSString* outputStr = [[[NSString alloc] initWithData: output encoding: NSUTF8StringEncoding] autorelease];
-    STAssertEqualObjects(outputStr, @"{\"error\":\"forbidden\",\"reason\":\"totally bogus\"}\n", nil);
+
+    TestConnection* conn = [TestConnection connectionWithMethod:@"PUT" path:@"/unittestdb/doc2"
+                                                           body:@"{\"something\":\"O HAI\"}"];
+    [conn run];
+    STAssertEquals(conn.response.statusCode, 403, @"Unexpected HTTP status (should be forbidden)");
+    STAssertEqualObjects(conn.responseString, @"{\"error\":\"forbidden\",\"reason\":\"totally bogus\"}\n", nil);
 }
 
 
@@ -311,7 +301,7 @@ extern CouchbaseMobile* sCouchbase;  // Defined in EmptyAppDelegate.m
     // by iriscouch.com (the "ValiCert Class 2 Policy Validation Authority"), so that this test
     // will pass.
     [self send: @"PUT" toPath: @"/unittestdb" body: nil];
-    [self send: @"POST" toPath: @"/_replicate" 
+    [self send: @"POST" toPath: @"/_replicate"
           body: @"{\"target\":\"unittestdb\","
                     "\"source\":\"https://snej.iriscouch.com/intentionally-left-blank\"}"];
 }
