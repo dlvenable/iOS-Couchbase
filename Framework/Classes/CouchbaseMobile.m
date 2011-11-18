@@ -192,11 +192,27 @@ static const NSTimeInterval kWaitTimeout = 30.0;    // How long to wait for Couc
     return YES;
 }
 
+- (BOOL)isServerRunning {
+    int port = [_serverURL.port intValue];
+    if (!port)
+        return NO;
+    struct sockaddr_in addr = {sizeof(struct sockaddr_in), AF_INET, htons(port), {0}};
+    int sockfd = socket(AF_INET,SOCK_STREAM, 0);
+    int result = connect(sockfd,(struct sockaddr*) &addr, sizeof(addr));
+    int connect_errno = errno;
+    close(sockfd);
+    if (_logLevel >= 2 && result != 0)
+        NSLog(@"Couchbase: Server not responding (errno=%i)", connect_errno);
+    return result == 0;
+}
+
 - (void) maybeRestart {
-    if (_autoRestart) [self restart];
+    if (_autoRestart && _serverURL && ![self isServerRunning])
+        [self restart];
 }
 
 - (void) restart {
+    _timeStarted = CFAbsoluteTimeGetCurrent();
     [[NSNotificationCenter defaultCenter]
      postNotificationName:kInternalRestartCouchNotification object:nil];
 }
